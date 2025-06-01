@@ -1,0 +1,98 @@
+name: Publish Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build extension
+        run: |
+          pnpm build:chrome
+          pnpm build:firefox
+          pnpm build:edge
+
+      - name: Package extensions
+        run: pnpm package
+
+      - name: Publish to Chrome Web Store
+        uses: PlasmoHQ/bpp@v3
+        with:
+          keys: ${{ secrets.CHROME_BPP_KEYS }}
+          artifact: build/chrome-mv3-prod.zip
+          target: chrome
+
+      - name: Publish to Firefox Add-ons
+        uses: PlasmoHQ/bpp@v3
+        with:
+          keys: ${{ secrets.FIREFOX_BPP_KEYS }}
+          artifact: build/firefox-mv2-prod.zip
+          target: firefox
+
+      - name: Publish to Edge Add-ons
+        uses: PlasmoHQ/bpp@v3
+        with:
+          keys: ${{ secrets.EDGE_BPP_KEYS }}
+          artifact: build/edge-mv3-prod.zip
+          target: edge
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/chrome-mv3-prod.zip
+            build/firefox-mv2-prod.zip
+            build/edge-mv3-prod.zip
+          body: |
+            ## 🚀 Extension v${{ github.ref_name }}
+
+            ### Chrome Web Store
+            [Install from Chrome Web Store](https://chrome.google.com/webstore/detail/${{ secrets.CHROME_EXTENSION_ID }})
+
+            ### Firefox Add-ons
+            [Install from Firefox Add-ons](https://addons.mozilla.org/addon/${{ secrets.FIREFOX_ADDON_ID }})
+
+            ### Microsoft Edge Add-ons
+            [Install from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/${{ secrets.EDGE_EXTENSION_ID }})
+
+            ### Manual Installation
+            Download the appropriate ZIP file below for your browser.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: "Extension Published"
+          description: "Version ${{ github.ref_name }} has been published to all stores!"
+          color: 0x00ff00

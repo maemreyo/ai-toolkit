@@ -1,0 +1,94 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run type checking
+        run: pnpm type-check
+
+      - name: Run linting
+        run: pnpm lint
+
+      - name: Run tests
+        run: pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Build extension
+        run: |
+          pnpm build:chrome
+          pnpm build:firefox
+          pnpm build:edge
+
+      - name: Upload Chrome build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: chrome-extension-${{ github.sha }}
+          path: build/chrome-mv3-prod
+
+      - name: Upload Firefox build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: firefox-extension-${{ github.sha }}
+          path: build/firefox-mv2-prod
+
+      - name: Upload Edge build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: edge-extension-${{ github.sha }}
+          path: build/edge-mv3-prod
+
+      - name: Check bundle size
+        run: |
+          echo "Chrome bundle size:"
+          du -sh build/chrome-mv3-prod
+          echo "Firefox bundle size:"
+          du -sh build/firefox-mv2-prod
+          echo "Edge bundle size:"
+          du -sh build/edge-mv3-prod

@@ -1,0 +1,105 @@
+{
+  "name": "@matthew.ngo/ai-toolkit",
+  "version": "1.0.0",
+  "description": "A comprehensive AI toolkit with multi-provider support",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./providers": {
+      "import": "./dist/providers/index.mjs",
+      "require": "./dist/providers/index.js",
+      "types": "./dist/providers/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext ts,tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx,md}\"",
+    "typecheck": "tsc --noEmit",
+    "release": "changeset publish",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@ai-sdk/core": "^3.0.0",
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@google/generative-ai": "^0.11.0",
+    "@huggingface/inference": "^2.6.0",
+    "bottleneck": "^2.19.5",
+    "exponential-backoff": "^3.1.1",
+    "gpt-tokenizer": "^2.1.2",
+    "llm-interface": "^2.0.0",
+    "lru-cache": "^10.2.0",
+    "openai": "^4.47.0",
+    "p-retry": "^6.2.0",
+    "prom-client": "^15.1.0",
+    "tiktoken": "^1.0.15",
+    "verror": "^1.10.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "@types/node": "^20.12.0",
+    "@types/react": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "@vitest/coverage-v8": "^1.5.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.0",
+    "react": "^18.3.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.5.0"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "openai",
+    "anthropic",
+    "google",
+    "machine-learning",
+    "toolkit",
+    "multi-provider"
+  ],
+  "author": "Htur Wehttam",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maemreyo/ai-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maemreyo/ai-toolkit/issues"
+  },
+  "homepage": "https://github.com/maemreyo/ai-toolkit#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

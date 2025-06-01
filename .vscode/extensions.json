@@ -1,0 +1,44 @@
+{
+  "recommendations": [
+    // Essential
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+
+    // TypeScript & React
+    "ms-vscode.vscode-typescript-next",
+    "dsznajder.es7-react-js-snippets",
+    "burkeholland.simple-react-snippets",
+
+    // Chrome Extension Development
+    "plasmo.plasmo-vscode",
+
+    // Productivity
+    "christian-kohler.path-intellisense",
+    "aaron-bond.better-comments",
+    "formulahendry.auto-rename-tag",
+    "naumovs.color-highlight",
+    "streetsidesoftware.code-spell-checker",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Testing
+    "orta.vscode-jest",
+    "ms-playwright.playwright",
+
+    // Database
+    "mtxr.sqltools",
+
+    // Other useful extensions
+    "yzhang.markdown-all-in-one",
+    "ms-azuretools.vscode-docker",
+    "gruntfuggly.todo-tree",
+    "wix.vscode-import-cost",
+    "usernamehw.errorlens",
+    "mikestead.dotenv",
+    "csstools.postcss",
+    "prisma.prisma"
+  ]
+}
