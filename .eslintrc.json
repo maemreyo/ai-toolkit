@@ -23,11 +23,7 @@
     "sourceType": "module",
     "project": ["./tsconfig.json"]
   },
-  "plugins": [
-    "react",
-    "react-hooks",
-    "@typescript-eslint"
-  ],
+  "plugins": ["react", "react-hooks", "@typescript-eslint"],
   "rules": {
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
@@ -69,10 +65,5 @@
       "version": "detect"
     }
   },
-  "ignorePatterns": [
-    "node_modules",
-    "build",
-    "*.config.js",
-    "*.config.ts"
-  ]
+  "ignorePatterns": ["node_modules", "build", "*.config.js", "*.config.ts"]
 }

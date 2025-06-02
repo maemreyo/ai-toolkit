@@ -1,11 +1,6 @@
 {
   "exclude": ["node_modules"],
-  "include": [
-    "./**/*.ts",
-    "./**/*.tsx",
-    "./src/**/*.ts",
-    "./src/**/*.tsx"
-  ],
+  "include": ["./**/*.ts", "./**/*.tsx", "./src/**/*.ts", "./src/**/*.tsx"],
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
@@ -26,12 +21,7 @@
       "~*": ["./src/*"],
       "@/*": ["./src/*"]
     },
-    "types": [
-      "chrome",
-      "node",
-      "jest",
-      "@testing-library/jest-dom"
-    ],
+    "types": ["node"],
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "declarationMap": true,

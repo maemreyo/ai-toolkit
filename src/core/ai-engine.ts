@@ -1,91 +1,90 @@
-import { ConfigManager } from './config-manager'
-import { CacheManager } from './cache-manager'
-import { RateLimiter } from './rate-limiter'
-import { RetryManager } from './retry-manager'
-import { TokenManager } from './token-manager'
-import { ErrorHandler, EnhancedError } from './error-handler'
-import { PerformanceMonitor } from '../monitoring/performance-monitor'
-import { Analytics } from '../monitoring/analytics'
-import { BaseProvider } from '../providers/base-provider'
-import { OpenAIProvider } from '../providers/openai-provider'
-import { AnthropicProvider } from '../providers/anthropic-provider'
-import { GoogleProvider } from '../providers/google-provider'
-import { MockProvider } from '../providers/mock-provider'
+import { Analytics } from "../monitoring/analytics";
+import { PerformanceMonitor } from "../monitoring/performance-monitor";
+import { AnthropicProvider } from "../providers/anthropic-provider";
+import { BaseProvider } from "../providers/base-provider";
+import { GoogleProvider } from "../providers/google-provider";
+import { MockProvider } from "../providers/mock-provider";
+import { OpenAIProvider } from "../providers/openai-provider";
 import {
   AIConfig,
   AIProviderType,
-  GenerateOptions,
-  AIResponse,
-  TokenUsage,
   Classification,
-  SummarizeOptions,
+  CodeGenerationOptions,
+  CodeResult,
+  GenerateOptions,
   ImageGenerationOptions,
   ImageResult,
+  SpeechOptions,
+  SummarizeOptions,
+  TokenUsage,
   TranscriptionOptions,
   TranscriptionResult,
-  SpeechOptions,
-  CodeGenerationOptions,
-  CodeResult
-} from '../types'
+} from "../types";
+import { CacheManager } from "./cache-manager";
+import { ConfigManager } from "./config-manager";
+import { ErrorHandler } from "./error-handler";
+import { RateLimiter } from "./rate-limiter";
+import { RetryManager } from "./retry-manager";
+import { TokenManager } from "./token-manager";
 
 export interface AIEngineOptions extends Partial<AIConfig> {
-  debug?: boolean
+  debug?: boolean;
 }
 
 export class AIEngine {
-  private config: ConfigManager
-  private providers = new Map<AIProviderType, BaseProvider>()
-  private cache: CacheManager
-  private rateLimiter: RateLimiter
-  private retryManager: RetryManager
-  private tokenManager: TokenManager
-  private errorHandler: ErrorHandler
-  private performanceMonitor: PerformanceMonitor
-  private analytics: Analytics
-  private debug: boolean
+  private config: ConfigManager;
+  private providers = new Map<AIProviderType, BaseProvider>();
+  private cache: CacheManager;
+  private rateLimiter: RateLimiter;
+  private retryManager: RetryManager;
+  private tokenManager: TokenManager;
+  private errorHandler: ErrorHandler;
+  private performanceMonitor: PerformanceMonitor;
+  private analytics: Analytics;
+  private debug: boolean;
 
   constructor(options: AIEngineOptions) {
-    this.debug = options.debug || false
-    
+    this.debug = options.debug || false;
+
     // Initialize core components
-    this.config = new ConfigManager(options)
+    this.config = new ConfigManager(options);
     this.cache = new CacheManager({
       ...this.config.getCacheConfig(),
-      namespace: 'ai-engine'
-    })
-    this.rateLimiter = new RateLimiter()
-    this.retryManager = new RetryManager(this.config.getRetryConfig())
-    this.tokenManager = new TokenManager()
-    this.errorHandler = new ErrorHandler()
-    this.performanceMonitor = new PerformanceMonitor()
-    this.analytics = new Analytics()
+      namespace: "ai-engine",
+    });
+    this.rateLimiter = new RateLimiter();
+    this.retryManager = new RetryManager(this.config.getRetryConfig());
+    this.tokenManager = new TokenManager();
+    this.errorHandler = new ErrorHandler();
+    this.performanceMonitor = new PerformanceMonitor();
+    this.analytics = new Analytics();
 
     // Initialize providers
-    this.initializeProviders()
-    
-    // Setup rate limiters
-    this.setupRateLimiters()
+    this.initializeProviders();
 
-    this.log('AI Engine initialized', { config: this.config.exportConfig() })
+    // Setup rate limiters
+    this.setupRateLimiters();
+
+    this.log("AI Engine initialized", { config: this.config.exportConfig() });
   }
 
   /**
    * Initialize providers based on configuration
    */
   private initializeProviders(): void {
-    const mainProvider = this.config.getConfig().provider
-    const fallbackProviders = this.config.getFallbackProviders()
-    const allProviders = [mainProvider, ...fallbackProviders]
+    const mainProvider = this.config.getConfig().provider;
+    const fallbackProviders = this.config.getFallbackProviders();
+    const allProviders = [mainProvider, ...fallbackProviders];
 
     for (const providerType of allProviders) {
       try {
-        const provider = this.createProvider(providerType)
+        const provider = this.createProvider(providerType);
         if (provider) {
-          this.providers.set(providerType, provider)
-          this.log(`Provider initialized: ${providerType}`)
+          this.providers.set(providerType, provider);
+          this.log(`Provider initialized: ${providerType}`);
         }
       } catch (error) {
-        this.log(`Failed to initialize provider: ${providerType}`, error)
+        this.log(`Failed to initialize provider: ${providerType}`, error);
       }
     }
   }
@@ -94,11 +93,11 @@ export class AIEngine {
    * Create a provider instance
    */
   private createProvider(type: AIProviderType): BaseProvider | null {
-    const providerConfig = this.config.getProviderConfig(type)
-    
-    if (!providerConfig.apiKey && type !== 'mock' && type !== 'local') {
-      this.log(`No API key for provider: ${type}`)
-      return null
+    const providerConfig = this.config.getProviderConfig(type);
+
+    if (!providerConfig.apiKey && type !== "mock" && type !== "local") {
+      this.log(`No API key for provider: ${type}`);
+      return null;
     }
 
     const config = {
@@ -108,20 +107,20 @@ export class AIEngine {
       baseUrl: providerConfig.baseUrl,
       headers: providerConfig.headers,
       timeout: this.config.getConfig().timeout,
-      maxRetries: this.config.getConfig().maxRetries
-    }
+      maxRetries: this.config.getConfig().maxRetries,
+    };
 
     switch (type) {
-      case 'openai':
-        return new OpenAIProvider(config)
-      case 'anthropic':
-        return new AnthropicProvider(config)
-      case 'google':
-        return new GoogleProvider(config)
-      case 'mock':
-        return new MockProvider(config)
+      case "openai":
+        return new OpenAIProvider(config);
+      case "anthropic":
+        return new AnthropicProvider(config);
+      case "google":
+        return new GoogleProvider(config);
+      case "mock":
+        return new MockProvider(config);
       default:
-        return null
+        return null;
     }
   }
 
@@ -129,38 +128,41 @@ export class AIEngine {
    * Setup rate limiters for each provider
    */
   private setupRateLimiters(): void {
-    const rateLimitConfig = this.config.getRateLimitConfig()
-    
+    const rateLimitConfig = this.config.getRateLimitConfig();
+
     for (const [providerType] of this.providers) {
       this.rateLimiter.createLimiter({
         id: providerType,
-        ...rateLimitConfig
-      })
+        ...rateLimitConfig,
+      });
     }
   }
 
   /**
    * Get provider with fallback support
    */
-  private async getProvider(): Promise<{ provider: BaseProvider; type: AIProviderType }> {
-    const mainType = this.config.getConfig().provider
-    const mainProvider = this.providers.get(mainType)
-    
+  private async getProvider(): Promise<{
+    provider: BaseProvider;
+    type: AIProviderType;
+  }> {
+    const mainType = this.config.getConfig().provider;
+    const mainProvider = this.providers.get(mainType);
+
     if (mainProvider) {
-      return { provider: mainProvider, type: mainType }
+      return { provider: mainProvider, type: mainType };
     }
 
     // Try fallback providers
-    const fallbacks = this.config.getFallbackProviders()
+    const fallbacks = this.config.getFallbackProviders();
     for (const fallbackType of fallbacks) {
-      const fallbackProvider = this.providers.get(fallbackType)
+      const fallbackProvider = this.providers.get(fallbackType);
       if (fallbackProvider) {
-        this.log(`Using fallback provider: ${fallbackType}`)
-        return { provider: fallbackProvider, type: fallbackType }
+        this.log(`Using fallback provider: ${fallbackType}`);
+        return { provider: fallbackProvider, type: fallbackType };
       }
     }
 
-    throw new Error('No available providers')
+    throw new Error("No available providers");
   }
 
   /**
@@ -170,35 +172,35 @@ export class AIEngine {
     operation: string,
     execute: (provider: BaseProvider) => Promise<T>,
     options?: {
-      cacheKey?: string
-      estimatedTokens?: number
-      skipCache?: boolean
+      cacheKey?: string;
+      estimatedTokens?: number;
+      skipCache?: boolean;
     }
   ): Promise<T> {
-    const operationId = `${operation}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
+    const operationId = `${operation}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Check cache
     if (!options?.skipCache && options?.cacheKey) {
-      const cached = await this.cache.get<T>(options.cacheKey)
+      const cached = await this.cache.get<T>(options.cacheKey);
       if (cached !== null) {
         this.analytics.trackEvent({
-          type: 'cache_hit',
-          provider: 'cache',
-          operation
-        })
-        return cached
+          type: "cache_hit",
+          provider: "cache",
+          operation,
+        });
+        return cached;
       }
     }
 
     // Get provider
-    const { provider, type: providerType } = await this.getProvider()
-    
+    const { provider, type: providerType } = await this.getProvider();
+
     // Start performance monitoring
     this.performanceMonitor.startOperation(
       operationId,
       operation,
       providerType
-    )
+    );
 
     try {
       // Check token limits if needed
@@ -206,164 +208,178 @@ export class AIEngine {
         const consumed = await this.rateLimiter.consumeTokens(
           providerType,
           options.estimatedTokens
-        )
+        );
         if (!consumed) {
-          throw new Error('Token limit exceeded')
+          throw new Error("Token limit exceeded");
         }
       }
 
       // Execute with rate limiting and retry
-      const result = await this.rateLimiter.schedule(
-        providerType,
-        () => this.retryManager.execute(
-          () => execute(provider),
-          {
-            provider: providerType,
-            operation
-          }
-        )
-      )
+      const result = await this.rateLimiter.schedule(providerType, () =>
+        this.retryManager.execute(() => execute(provider), {
+          provider: providerType,
+          operation,
+        })
+      );
 
       // End performance monitoring
-      const perfReport = this.performanceMonitor.endOperation(operationId, true)
+      const perfReport = this.performanceMonitor.endOperation(
+        operationId,
+        true
+      );
 
       // Track analytics
       this.analytics.trackEvent({
-        type: 'success',
+        type: "success",
         provider: providerType,
         operation,
         model: this.config.getModel(providerType),
-        latency: perfReport?.duration
-      })
+        latency: perfReport?.duration,
+      });
 
       // Cache result if applicable
       if (!options?.skipCache && options?.cacheKey) {
-        await this.cache.set(options.cacheKey, result)
+        await this.cache.set(options.cacheKey, result);
       }
 
-      return result
-
+      return result;
     } catch (error) {
       // Handle error
       const enhancedError = this.errorHandler.handleError(error, {
         provider: providerType,
-        operation
-      })
+        operation,
+      });
 
       // End performance monitoring
-      this.performanceMonitor.endOperation(operationId, false, enhancedError.message)
+      this.performanceMonitor.endOperation(
+        operationId,
+        false,
+        enhancedError.message
+      );
 
       // Track error
       this.analytics.trackEvent({
-        type: 'error',
+        type: "error",
         provider: providerType,
         operation,
-        error: enhancedError.message
-      })
+        error: enhancedError.message,
+      });
 
-      throw enhancedError
+      throw enhancedError;
     }
   }
 
   /**
    * Generate text completion
    */
-  async generateText(prompt: string, options?: GenerateOptions): Promise<string> {
+  async generateText(
+    prompt: string,
+    options?: GenerateOptions
+  ): Promise<string> {
     const cacheKey = this.cache.createTextGenerationKey(
       prompt,
       options,
       this.config.getConfig().provider,
       this.config.getModel()
-    )
+    );
 
     const estimatedTokens = await this.tokenManager.countTokens(
       prompt,
-      this.config.getModel() || 'gpt-3.5-turbo'
-    )
+      this.config.getModel() || "gpt-3.5-turbo"
+    );
 
     const result = await this.executeOperation(
-      'generateText',
+      "generateText",
       (provider) => provider.generateText(prompt, options),
       {
         cacheKey,
         estimatedTokens,
-        skipCache: options?.stream
+        skipCache: options?.stream,
       }
-    )
+    );
 
     // Track token usage
     const responseTokens = await this.tokenManager.countTokens(
       result,
-      this.config.getModel() || 'gpt-3.5-turbo'
-    )
+      this.config.getModel() || "gpt-3.5-turbo"
+    );
 
     const usage: TokenUsage = {
       promptTokens: estimatedTokens,
       completionTokens: responseTokens,
-      totalTokens: estimatedTokens + responseTokens
-    }
+      totalTokens: estimatedTokens + responseTokens,
+    };
 
-    const cost = this.tokenManager.estimateCost(
-      usage.promptTokens,
-      this.config.getModel() || 'gpt-3.5-turbo',
-      'input'
-    ) + this.tokenManager.estimateCost(
-      usage.completionTokens,
-      this.config.getModel() || 'gpt-3.5-turbo',
-      'output'
-    )
+    const cost =
+      this.tokenManager.estimateCost(
+        usage.promptTokens,
+        this.config.getModel() || "gpt-3.5-turbo",
+        "input"
+      ) +
+      this.tokenManager.estimateCost(
+        usage.completionTokens,
+        this.config.getModel() || "gpt-3.5-turbo",
+        "output"
+      );
 
     this.analytics.trackEvent({
-      type: 'success',
+      type: "success",
       provider: this.config.getConfig().provider,
-      operation: 'generateText',
+      operation: "generateText",
       model: this.config.getModel(),
       tokens: {
         prompt: usage.promptTokens,
         completion: usage.completionTokens,
-        total: usage.totalTokens
+        total: usage.totalTokens,
       },
-      cost
-    })
+      cost,
+    });
 
-    return result
+    return result;
   }
 
   /**
    * Generate streaming text completion
    */
-  async *generateStream(prompt: string, options?: GenerateOptions): AsyncGenerator<string> {
-    const { provider, type: providerType } = await this.getProvider()
-    
+  async *generateStream(
+    prompt: string,
+    options?: GenerateOptions
+  ): AsyncGenerator<string> {
+    const { provider, type: providerType } = await this.getProvider();
+
     if (!provider.generateStream) {
-      throw new Error(`Provider ${providerType} does not support streaming`)
+      throw new Error(`Provider ${providerType} does not support streaming`);
     }
 
-    const operationId = `generateStream-${Date.now()}`
-    this.performanceMonitor.startOperation(operationId, 'generateStream', providerType)
+    const operationId = `generateStream-${Date.now()}`;
+    this.performanceMonitor.startOperation(
+      operationId,
+      "generateStream",
+      providerType
+    );
 
     try {
-      yield* provider.generateStream(prompt, options)
-      
-      this.performanceMonitor.endOperation(operationId, true)
-      
+      yield* provider.generateStream(prompt, options);
+
+      this.performanceMonitor.endOperation(operationId, true);
+
       this.analytics.trackEvent({
-        type: 'success',
+        type: "success",
         provider: providerType,
-        operation: 'generateStream',
-        model: this.config.getModel(providerType)
-      })
-    } catch (error) {
-      this.performanceMonitor.endOperation(operationId, false, error.message)
-      
+        operation: "generateStream",
+        model: this.config.getModel(providerType),
+      });
+    } catch (error: any) {
+      this.performanceMonitor.endOperation(operationId, false, error.message);
+
       this.analytics.trackEvent({
-        type: 'error',
+        type: "error",
         provider: providerType,
-        operation: 'generateStream',
-        error: error.message
-      })
-      
-      throw error
+        operation: "generateStream",
+        error: error.message,
+      });
+
+      throw error;
     }
   }
 
@@ -375,92 +391,97 @@ export class AIEngine {
       text,
       this.config.getConfig().provider,
       this.config.getModel()
-    )
+    );
 
     return this.executeOperation(
-      'generateEmbedding',
+      "generateEmbedding",
       (provider) => provider.generateEmbedding(text),
       { cacheKey }
-    )
+    );
   }
 
   /**
    * Classify text
    */
   async classifyText(text: string, labels: string[]): Promise<Classification> {
-    const cacheKey = this.cache.generateKey('classifyText', [text, labels])
+    const cacheKey = this.cache.generateKey("classifyText", [text, labels]);
 
     return this.executeOperation(
-      'classifyText',
+      "classifyText",
       (provider) => provider.classifyText(text, labels),
       { cacheKey }
-    )
+    );
   }
 
   /**
    * Summarize text
    */
   async summarize(text: string, options?: SummarizeOptions): Promise<string> {
-    const cacheKey = this.cache.generateKey('summarize', [text, options])
+    const cacheKey = this.cache.generateKey("summarize", [text, options]);
 
     return this.executeOperation(
-      'summarize',
+      "summarize",
       (provider) => provider.summarize(text, options),
       { cacheKey }
-    )
+    );
   }
 
   /**
    * Generate image
    */
-  async generateImage(prompt: string, options?: ImageGenerationOptions): Promise<ImageResult> {
-    return this.executeOperation(
-      'generateImage',
-      (provider) => provider.generateImage(prompt, options)
-    )
+  async generateImage(
+    prompt: string,
+    options?: ImageGenerationOptions
+  ): Promise<ImageResult> {
+    return this.executeOperation("generateImage", (provider) =>
+      provider.generateImage(prompt, options)
+    );
   }
 
   /**
    * Transcribe audio
    */
-  async transcribeAudio(audio: Blob, options?: TranscriptionOptions): Promise<TranscriptionResult> {
-    return this.executeOperation(
-      'transcribeAudio',
-      (provider) => provider.transcribeAudio(audio, options)
-    )
+  async transcribeAudio(
+    audio: Blob,
+    options?: TranscriptionOptions
+  ): Promise<TranscriptionResult> {
+    return this.executeOperation("transcribeAudio", (provider) =>
+      provider.transcribeAudio(audio, options)
+    );
   }
 
   /**
    * Generate speech
    */
   async generateSpeech(text: string, options?: SpeechOptions): Promise<Blob> {
-    return this.executeOperation(
-      'generateSpeech',
-      (provider) => provider.generateSpeech(text, options)
-    )
+    return this.executeOperation("generateSpeech", (provider) =>
+      provider.generateSpeech(text, options)
+    );
   }
 
   /**
    * Generate code
    */
-  async generateCode(prompt: string, options?: CodeGenerationOptions): Promise<CodeResult> {
-    return this.executeOperation(
-      'generateCode',
-      (provider) => provider.generateCode(prompt, options)
-    )
+  async generateCode(
+    prompt: string,
+    options?: CodeGenerationOptions
+  ): Promise<CodeResult> {
+    return this.executeOperation("generateCode", (provider) =>
+      provider.generateCode(prompt, options)
+    );
   }
 
   /**
    * Update configuration
    */
   async updateConfig(config: Partial<AIConfig>): Promise<void> {
-    this.config.updateConfig(config)
-    
+    this.config.updateConfig(config);
+
     // Reinitialize components if needed
-    this.initializeProviders()
-    this.setupRateLimiters()
-    
-    this.log('Configuration updated', { config: this.config.exportConfig() })
+    this.initializeProviders();
+    this.setupRateLimiters();
+
+    this.log("Configuration updated", { config: this.config.exportConfig() });
   }
 
   /**
@@ -473,20 +494,20 @@ export class AIEngine {
       cache: this.cache.getStats(),
       rateLimiter: this.rateLimiter.getAllStats(),
       errors: this.errorHandler.getErrorStats(),
-      health: this.performanceMonitor.getHealthStatus()
-    }
+      health: this.performanceMonitor.getHealthStatus(),
+    };
   }
 
   /**
    * Clear all caches and reset statistics
    */
   async reset(): Promise<void> {
-    await this.cache.clear()
-    this.analytics.reset()
-    this.performanceMonitor.clearHistory()
-    this.errorHandler.clearHistory()
-    
-    this.log('AI Engine reset')
+    await this.cache.clear();
+    this.analytics.reset();
+    this.performanceMonitor.clearHistory();
+    this.errorHandler.clearHistory();
+
+    this.log("AI Engine reset");
   }
 
   /**
@@ -494,7 +515,7 @@ export class AIEngine {
    */
   private log(message: string, data?: any): void {
     if (this.debug) {
-      console.log(`[AI Engine] ${message}`, data || '')
+      console.log(`[AI Engine] ${message}`, data || "");
     }
   }
 
@@ -502,13 +523,13 @@ export class AIEngine {
    * Export configuration
    */
   exportConfig() {
-    return this.config.exportConfig()
+    return this.config.exportConfig();
   }
 
   /**
    * Get available providers
    */
   getAvailableProviders(): AIProviderType[] {
-    return Array.from(this.providers.keys())
+    return Array.from(this.providers.keys());
   }
 }
