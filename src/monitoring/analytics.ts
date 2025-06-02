@@ -414,7 +414,7 @@ export class Analytics {
     }
 
     // Provider recommendations
-    providerComparison.forEach(({ provider, stats, rank }) => {
+    providerComparison.forEach(({ provider, stats }) => {
       if (stats.errorRate > 0.05) {
         recommendations.push(
           `${provider} has high error rate (${(stats.errorRate * 100).toFixed(1)}%). Consider using fallback providers.`
@@ -475,9 +475,12 @@ export class Analytics {
   exportData(): {
     stats: AIUsageStats;
     trends: UsageTrend[];
-    topOperations: ReturnType<typeof this.getTopOperations>;
-    costBreakdown: ReturnType<typeof this.getCostBreakdown>;
-    providerComparison: ReturnType<typeof this.getProviderComparison>;
+    // topOperations: ReturnType<AnalyticsManager["getTopOperations"]>;
+    topOperations: ReturnType<any>;
+    // costBreakdown: ReturnType<AnalyticsManager["getCostBreakdown"]>;
+    costBreakdown: ReturnType<any>;
+    // providerComparison: ReturnType<AnalyticsManager["getProviderComparison"]>;
+    providerComparison: ReturnType<any>;
     recommendations: string[];
   } {
     return {

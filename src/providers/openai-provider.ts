@@ -40,7 +40,7 @@ export class OpenAIProvider extends BaseProvider {
     prompt: string,
     options?: GenerateOptions
   ): Promise<string> {
-    const model = this.getModel(options);
+    const model = this.getModel(options as { model?: string });
 
     const completion = await this.client.chat.completions.create({
       model,
@@ -66,7 +66,7 @@ export class OpenAIProvider extends BaseProvider {
       stream: false,
     });
 
-    return completion.choices[0].message.content || "";
+    return completion.choices[0]?.message?.content || "";
   }
 
   /**
@@ -76,7 +76,7 @@ export class OpenAIProvider extends BaseProvider {
     prompt: string,
     options?: GenerateOptions
   ): AsyncGenerator<string> {
-    const model = this.getModel(options);
+    const model = this.getModel(options as { model?: string });
 
     const stream = await this.client.chat.completions.create({
       model,
@@ -117,7 +117,7 @@ export class OpenAIProvider extends BaseProvider {
       input: text,
     });
 
-    return response.data[0].embedding;
+    return response.data[0]?.embedding || [];
   }
 
   /**
@@ -148,7 +148,7 @@ Response:`;
       return JSON.parse(response);
     } catch {
       // Fallback if JSON parsing fails
-      const label = labels[0];
+      const label = labels[0] || "unknown";
       return {
         label,
         confidence: 0.5,
@@ -250,9 +250,9 @@ Summary:`;
 
     return {
       text: transcription.text,
-      language: transcription.language,
-      duration: transcription.duration,
-      words: transcription.words?.map((w) => ({
+      language: (transcription as any).language,
+      duration: (transcription as any).duration,
+      words: (transcription as any).words?.map((w: any) => ({
         word: w.word,
         start: w.start,
         end: w.end,
@@ -350,7 +350,7 @@ Provide a clear explanation of:
   /**
    * Calculate token usage from OpenAI response
    */
-  private extractTokenUsage(usage: any): TokenUsage {
+  private _extractTokenUsage(usage: any): TokenUsage {
     return {
       promptTokens: usage?.prompt_tokens || 0,
       completionTokens: usage?.completion_tokens || 0,
