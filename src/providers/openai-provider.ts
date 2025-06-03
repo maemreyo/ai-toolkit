@@ -8,7 +8,6 @@ import {
   ImageResult,
   SpeechOptions,
   SummarizeOptions,
-  TokenUsage,
   TranscriptionOptions,
   TranscriptionResult,
 } from "../types";
@@ -347,14 +346,14 @@ Provide a clear explanation of:
     });
   }
 
-  /**
-   * Calculate token usage from OpenAI response
-   */
-  private _extractTokenUsage(usage: any): TokenUsage {
-    return {
-      promptTokens: usage?.prompt_tokens || 0,
-      completionTokens: usage?.completion_tokens || 0,
-      totalTokens: usage?.total_tokens || 0,
-    };
-  }
+  // /**
+  //  * Calculate token usage from OpenAI response
+  //  */
+  // private _extractTokenUsage(usage: any): TokenUsage {
+  //   return {
+  //     promptTokens: usage?.prompt_tokens || 0,
+  //     completionTokens: usage?.completion_tokens || 0,
+  //     totalTokens: usage?.total_tokens || 0,
+  //   };
+  // }
 }

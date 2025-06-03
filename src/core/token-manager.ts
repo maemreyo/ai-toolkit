@@ -119,7 +119,7 @@ export class TokenManager {
   ): Promise<TokenInfo> {
     const count = await this.countTokens(text, model);
     const limit =
-      maxTokens ?? this.tokenLimits[model] ?? this.tokenLimits.default;
+      maxTokens ?? this.tokenLimits[model] ?? this.tokenLimits.default ?? 4096;
 
     return {
       count,
@@ -138,7 +138,8 @@ export class TokenManager {
     responseTokens: number = 1000
   ): Promise<{ valid: boolean; availableTokens: number }> {
     const promptTokens = await this.countTokens(text, model);
-    const modelLimit = this.tokenLimits[model] ?? this.tokenLimits.default;
+    const modelLimit =
+      this.tokenLimits[model] ?? this.tokenLimits.default ?? 4096;
     const limit = maxTokens ?? modelLimit;
 
     const totalRequired = promptTokens + responseTokens;
@@ -290,7 +291,7 @@ export class TokenManager {
    * Get model token limit
    */
   getModelTokenLimit(model: string): number {
-    return this.tokenLimits[model] ?? this.tokenLimits.default;
+    return this.tokenLimits[model] ?? this.tokenLimits.default ?? 4096;
   }
 
   /**

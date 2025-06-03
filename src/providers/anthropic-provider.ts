@@ -1,10 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  Classification,
-  GenerateOptions,
-  SummarizeOptions,
-  TokenUsage,
-} from "../types";
+import { Classification, GenerateOptions, SummarizeOptions } from "../types";
 import { BaseProvider, ProviderConfig } from "./base-provider";
 
 export class AnthropicProvider extends BaseProvider {
@@ -213,7 +208,7 @@ Text: "${text}"`;
   /**
    * Generate embeddings (not supported by Anthropic)
    */
-  override async generateEmbedding(text: string): Promise<number[]> {
+  override async generateEmbedding(_text: string): Promise<number[]> {
     throw new Error(
       "Embeddings not supported by Anthropic. Use a different provider."
     );
@@ -288,13 +283,13 @@ Explain:
   }
 
   /**
-   * Extract token usage from response
-   */
-  private extractTokenUsage(usage: any): TokenUsage {
-    return {
-      promptTokens: usage?.input_tokens || 0,
-      completionTokens: usage?.output_tokens || 0,
-      totalTokens: (usage?.input_tokens || 0) + (usage?.output_tokens || 0),
-    };
-  }
+  //  * Extract token usage from response
+  //  */
+  // private _extractTokenUsage(usage: any): TokenUsage {
+  //   return {
+  //     promptTokens: usage?.input_tokens || 0,
+  //     completionTokens: usage?.output_tokens || 0,
+  //     totalTokens: (usage?.input_tokens || 0) + (usage?.output_tokens || 0),
+  //   };
+  // }
 }
