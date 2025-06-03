@@ -480,5 +480,5 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 ## Support
 
 - [Documentation](https://docs.matthew.ngo.com/ai-toolkit)
-- [GitHub Issues](https://github.com/matthew.ngo/ai-toolkit/issues)
+- [GitHub Issues](https://github.com/maemreyo/ai-toolkit/issues)
 - [Discord Community](https://discord.gg/matthew.ngo)
