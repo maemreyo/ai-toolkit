@@ -495,7 +495,7 @@ export class AIEngine {
       rateLimiter: this.rateLimiter.getAllStats(),
       errors: this.errorHandler.getErrorStats(),
       health: this.performanceMonitor.getHealthStatus(),
-    };
+    } as any;
   }
 
   /**
