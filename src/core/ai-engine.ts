@@ -76,16 +76,28 @@ export class AIEngine {
     const fallbackProviders = this.config.getFallbackProviders();
     const allProviders = [mainProvider, ...fallbackProviders];
 
+    this.log(`Attempting to initialize providers: ${allProviders.join(', ')}`);
+
     for (const providerType of allProviders) {
       try {
         const provider = this.createProvider(providerType);
         if (provider) {
           this.providers.set(providerType, provider);
           this.log(`Provider initialized: ${providerType}`);
+        } else {
+          this.log(
+            `Provider skipped (no API key or unsupported): ${providerType}`
+          );
         }
       } catch (error) {
         this.log(`Failed to initialize provider: ${providerType}`, error);
       }
+    }
+
+    if (this.providers.size === 0) {
+      this.log(
+        'WARNING: No providers were successfully initialized. Consider adding API keys or using mock provider for testing.'
+      );
     }
   }
 
