@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Toolkit Browser Test</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 30px;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 4px;
+      }
+      .test-section h3 {
+        margin-top: 0;
+        color: #555;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-bottom: 10px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 15px;
+        padding: 15px;
+        background: #e9ecef;
+        border-radius: 4px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      textarea {
+        min-height: 100px;
+        font-family: monospace;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+      }
+      .stat-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+      }
+      .stat-card h4 {
+        margin: 0 0 10px 0;
+        color: #495057;
+        font-size: 14px;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🚀 AI Toolkit Browser Compatibility Test</h1>
+
+      <div class="test-section">
+        <h3>Browser Compatibility Check</h3>
+        <button onclick="checkCompatibility()">Check Compatibility</button>
+        <div id="compatibility-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Initialize AI Toolkit</h3>
+        <label>
+          Provider:
+          <select id="provider">
+            <option value="mock">Mock (Testing)</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="google">Google</option>
+          </select>
+        </label>
+        <label>
+          API Key (optional for mock):
+          <input type="password" id="apiKey" placeholder="sk-..." />
+        </label>
+        <button onclick="initializeAI()">Initialize</button>
+        <div id="init-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Token Counting</h3>
+        <label>
+          Text:
+          <textarea id="tokenText">
+Hello, this is a test message for token counting! Let's see how many tokens this text contains.</textarea
+          >
+        </label>
+        <label>
+          Model:
+          <select id="tokenModel">
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            <option value="gpt-4">GPT-4</option>
+            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+          </select>
+        </label>
+        <button onclick="countTokens()">Count Tokens</button>
+        <div id="token-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Text Generation</h3>
+        <label>
+          Prompt:
+          <textarea id="prompt">
+Write a haiku about artificial intelligence</textarea
+          >
+        </label>
+        <button onclick="generateText()" id="generateBtn">Generate Text</button>
+        <div id="generate-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Cache Operations</h3>
+        <button onclick="testCache()">Test Cache</button>
+        <button onclick="clearCache()">Clear Cache</button>
+        <button onclick="getCacheStats()">Get Cache Stats</button>
+        <div id="cache-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Performance Stats</h3>
+        <button onclick="getPerformanceStats()">Get Performance Stats</button>
+        <div id="performance-stats" class="stats"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      // Import AI Toolkit (adjust path as needed)
+      import * as AIToolkit from './dist/index.mjs';
+
+      // Make it available globally for testing
+      window.AIToolkit = AIToolkit;
+      window.ai = null;
+
+      // Compatibility check
+      window.checkCompatibility = async function () {
+        const resultDiv = document.getElementById('compatibility-result');
+        try {
+          const compat = AIToolkit.checkBrowserCompatibility();
+          if (compat.compatible) {
+            resultDiv.className = 'result success';
+            resultDiv.textContent = '✅ Browser is fully compatible!';
+          } else {
+            resultDiv.className = 'result error';
+            resultDiv.textContent = `❌ Browser compatibility issues:\n${compat.issues.join('\n')}`;
+          }
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        }
+      };
+
+      // Initialize AI
+      window.initializeAI = async function () {
+        const resultDiv = document.getElementById('init-result');
+        const provider = document.getElementById('provider').value;
+        const apiKey = document.getElementById('apiKey').value;
+
+        try {
+          resultDiv.className = 'result info';
+          resultDiv.textContent = 'Initializing...';
+
+          const config = {
+            provider,
+            apiKey: apiKey || undefined,
+            cache: {
+              enabled: true,
+              ttl: 600000,
+              maxSize: 10,
+              strategy: 'lru',
+            },
+          };
+
+          window.ai = await AIToolkit.createAI(config);
+
+          resultDiv.className = 'result success';
+          resultDiv.textContent = `✅ AI initialized successfully!\nProvider: ${provider}\nVersion: ${AIToolkit.VERSION}`;
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}\n${error.stack}`;
+        }
+      };
+
+      // Token counting
+      window.countTokens = async function () {
+        const resultDiv = document.getElementById('token-result');
+        const text = document.getElementById('tokenText').value;
+        const model = document.getElementById('tokenModel').value;
+
+        try {
+          resultDiv.className = 'result info';
+          resultDiv.textContent = 'Counting tokens...';
+
+          const tokenManager = new AIToolkit.TokenManager();
+          const startTime = performance.now();
+          const tokenCount = await tokenManager.countTokens(text, model);
+          const endTime = performance.now();
+
+          const info = await tokenManager.getTokenInfo(text, model);
+
+          resultDiv.className = 'result success';
+          resultDiv.textContent = `Token Count: ${tokenCount}
+Character Count: ${text.length}
+Ratio: ${(tokenCount / text.length).toFixed(2)} tokens per character
+Model: ${model}
+Model Limit: ${tokenManager.getModelTokenLimit(model)} tokens
+Within Limit: ${info.truncated ? '❌ No' : '✅ Yes'}
+Processing Time: ${(endTime - startTime).toFixed(2)}ms`;
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        }
+      };
+
+      // Text generation
+      window.generateText = async function () {
+        const resultDiv = document.getElementById('generate-result');
+        const prompt = document.getElementById('prompt').value;
+        const btn = document.getElementById('generateBtn');
+
+        if (!window.ai) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = 'Please initialize AI first!';
+          return;
+        }
+
+        try {
+          btn.disabled = true;
+          resultDiv.className = 'result info';
+          resultDiv.textContent = 'Generating...';
+
+          const startTime = performance.now();
+          const result = await window.ai.generateText(prompt, {
+            maxTokens: 100,
+            temperature: 0.7,
+          });
+          const endTime = performance.now();
+
+          resultDiv.className = 'result success';
+          resultDiv.textContent = `Generated Text:\n${result}\n\nGeneration Time: ${(endTime - startTime).toFixed(2)}ms`;
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      // Cache testing
+      window.testCache = async function () {
+        const resultDiv = document.getElementById('cache-result');
+
+        try {
+          const cache = new AIToolkit.CacheManager({
+            enabled: true,
+            ttl: 60000,
+            maxSize: 10,
+            strategy: 'lru',
+          });
+
+          // Test cache operations
+          const testKey = await cache.generateKey('test', ['param1', 'param2']);
+          await cache.set(testKey, {
+            data: 'test value',
+            timestamp: Date.now(),
+          });
+
+          const retrieved = await cache.get(testKey);
+
+          // Test localStorage
+          await cache.saveToLocalStorage('ai-toolkit-demo-cache');
+
+          const stats = cache.getStats();
+
+          resultDiv.className = 'result success';
+          resultDiv.textContent = `Cache Test Results:
+Key Generated: ${testKey.substring(0, 50)}...
+Value Set: ✅
+Value Retrieved: ${retrieved ? '✅' : '❌'}
+Saved to LocalStorage: ✅
+Stats: ${JSON.stringify(stats, null, 2)}`;
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        }
+      };
+
+      // Clear cache
+      window.clearCache = async function () {
+        const resultDiv = document.getElementById('cache-result');
+
+        try {
+          if (window.ai) {
+            await window.ai.reset();
+          }
+          localStorage.removeItem('ai-toolkit-demo-cache');
+
+          resultDiv.className = 'result success';
+          resultDiv.textContent = 'Cache cleared successfully!';
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        }
+      };
+
+      // Get cache stats
+      window.getCacheStats = async function () {
+        const resultDiv = document.getElementById('cache-result');
+
+        if (!window.ai) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = 'Please initialize AI first!';
+          return;
+        }
+
+        try {
+          const stats = window.ai.getStats();
+
+          resultDiv.className = 'result info';
+          resultDiv.textContent = `AI Stats:\n${JSON.stringify(stats, null, 2)}`;
+        } catch (error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `Error: ${error.message}`;
+        }
+      };
+
+      // Get performance stats
+      window.getPerformanceStats = async function () {
+        const statsDiv = document.getElementById('performance-stats');
+
+        if (!window.ai) {
+          statsDiv.innerHTML =
+            '<div class="result error">Please initialize AI first!</div>';
+          return;
+        }
+
+        try {
+          const stats = window.ai.getStats();
+
+          statsDiv.innerHTML = `
+                    <div class="stat-card">
+                        <h4>Requests</h4>
+                        <div class="stat-value">${stats.usage?.requestsCount || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Tokens Used</h4>
+                        <div class="stat-value">${stats.usage?.tokensUsed || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Cache Hit Rate</h4>
+                        <div class="stat-value">${((stats.cache?.hitRate || 0) * 100).toFixed(1)}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Health Status</h4>
+                        <div class="stat-value">${stats.health?.status || 'Unknown'}</div>
+                    </div>
+                `;
+        } catch (error) {
+          statsDiv.innerHTML = `<div class="result error">Error: ${error.message}</div>`;
+        }
+      };
+
+      // Auto-check compatibility on load
+      window.addEventListener('load', () => {
+        checkCompatibility();
+      });
+    </script>
+  </body>
+</html>

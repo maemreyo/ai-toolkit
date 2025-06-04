@@ -1,25 +1,25 @@
-import pRetry, { AbortError } from 'p-retry'
-import { backOff } from 'exponential-backoff'
-import VError from 'verror'
-import { RetryConfig } from '../types'
+import { backOff } from 'exponential-backoff';
+import pRetry, { AbortError } from 'p-retry';
+import { RetryConfig } from '../types';
+import { EnhancedError, ErrorContext } from './enhanced-error';
 
-interface RetryContext {
-  provider: string
-  operation: string
-  model?: string
-  metadata?: Record<string, any>
+interface RetryContext extends ErrorContext {
+  provider: string;
+  operation: string;
+  model?: string;
+  metadata?: Record<string, any>;
 }
 
 interface RetryOptions extends RetryConfig {
-  onRetry?: (error: Error, attempt: number) => void
-  shouldRetry?: (error: any) => boolean
+  onRetry?: (error: Error, attempt: number) => void;
+  shouldRetry?: (error: any) => boolean;
 }
 
 export class RetryManager {
-  private config: RetryConfig
+  private config: RetryConfig;
 
   constructor(config: RetryConfig) {
-    this.config = config
+    this.config = config;
   }
 
   /**
@@ -30,27 +30,27 @@ export class RetryManager {
     context: RetryContext,
     options?: Partial<RetryOptions>
   ): Promise<T> {
-    const mergedOptions = { ...this.config, ...options }
-    
+    const mergedOptions = { ...this.config, ...options };
+
     return pRetry(
       async (attemptNumber) => {
         try {
-          return await operation()
+          return await operation();
         } catch (error) {
           // Wrap error with context
-          const wrappedError = this.wrapError(error, context, attemptNumber)
-          
+          const wrappedError = this.wrapError(error, context, attemptNumber);
+
           // Check if we should retry
-          if (!this.shouldRetry(error, mergedOptions)) {
-            throw new AbortError(wrappedError)
+          if (!this.shouldRetry(wrappedError, mergedOptions)) {
+            throw new AbortError(wrappedError);
           }
-          
+
           // Call retry callback if provided
           if (mergedOptions.onRetry) {
-            mergedOptions.onRetry(wrappedError, attemptNumber)
+            mergedOptions.onRetry(wrappedError, attemptNumber);
           }
-          
-          throw wrappedError
+
+          throw wrappedError;
         }
       },
       {
@@ -64,10 +64,10 @@ export class RetryManager {
           console.warn(
             `Retry attempt ${error.attemptNumber} failed for ${context.operation}:`,
             error.message
-          )
-        }
+          );
+        },
       }
-    )
+    );
   }
 
   /**
@@ -78,8 +78,8 @@ export class RetryManager {
     context: RetryContext,
     options?: Partial<RetryOptions>
   ): Promise<T> {
-    const mergedOptions = { ...this.config, ...options }
-    
+    const mergedOptions = { ...this.config, ...options };
+
     try {
       return await backOff(operation, {
         numOfAttempts: mergedOptions.maxAttempts,
@@ -88,83 +88,76 @@ export class RetryManager {
         jitter: 'full',
         timeMultiple: 2,
         retry: (error, attemptNumber) => {
-          const shouldRetry = this.shouldRetry(error, mergedOptions)
-          
+          const wrappedError = this.wrapError(error, context, attemptNumber);
+          const shouldRetry = this.shouldRetry(wrappedError, mergedOptions);
+
           if (shouldRetry && mergedOptions.onRetry) {
-            mergedOptions.onRetry(error, attemptNumber)
+            mergedOptions.onRetry(wrappedError, attemptNumber);
           }
-          
-          return shouldRetry
-        }
-      })
+
+          return shouldRetry;
+        },
+      });
     } catch (error) {
-      throw this.wrapError(error, context, mergedOptions.maxAttempts)
+      throw this.wrapError(error, context, mergedOptions.maxAttempts);
     }
   }
 
   /**
-   * Wrap error with context information
+   * Wrap error with context information using EnhancedError
    */
-  private wrapError(error: any, context: RetryContext, attempt: number): Error {
-    return new VError(
+  private wrapError(
+    error: any,
+    context: RetryContext,
+    attempt: number
+  ): EnhancedError {
+    const errorContext: ErrorContext = {
+      ...context,
+      attempt,
+    };
+
+    const enhancedError = new EnhancedError(
+      `Failed to execute ${context.operation} on ${context.provider} (attempt ${attempt})`,
       {
-        name: 'AIProviderError',
         cause: error,
-        info: {
-          ...context,
-          attempt,
-          timestamp: new Date().toISOString(),
-          errorCode: error.code || error.status,
-          errorType: this.categorizeError(error)
-        }
-      },
-      `Failed to execute ${context.operation} on ${context.provider} (attempt ${attempt})`
-    )
+        context: errorContext,
+        category: this.categorizeError(error),
+        isRetryable: this.isRetryableError(error),
+      }
+    );
+
+    return enhancedError;
   }
 
   /**
    * Determine if error should trigger retry
    */
-  private shouldRetry(error: any, options: RetryOptions): boolean {
+  private shouldRetry(error: EnhancedError, options: RetryOptions): boolean {
     // Use custom retry logic if provided
     if (options.shouldRetry) {
-      return options.shouldRetry(error)
+      return options.shouldRetry(error);
     }
-    
-    // Check error categorization
-    const errorType = this.categorizeError(error)
-    
-    switch (errorType) {
-      case 'authentication':
-      case 'invalid_request':
-      case 'not_found':
-      case 'permission_denied':
-        // Don't retry these errors
-        return false
-      
-      case 'rate_limit':
-        // Always retry rate limits with backoff
-        return true
-      
-      case 'server_error':
-      case 'network':
-      case 'timeout':
-        // Retry these errors
-        return true
-      
-      default:
-        // Default to retry for unknown errors
-        return true
-    }
+
+    // Use enhanced error's retryable property
+    return error.isRetryable || false;
+  }
+
+  /**
+   * Check if error is retryable based on type
+   */
+  private isRetryableError(error: any): boolean {
+    const errorType = this.categorizeError(error);
+    const retryableTypes = ['rate_limit', 'server_error', 'network', 'timeout'];
+    return retryableTypes.includes(errorType);
   }
 
   /**
    * Categorize error type
    */
   private categorizeError(error: any): string {
-    const message = error.message?.toLowerCase() || ''
-    const code = error.code || error.status
-    
+    const message = error.message?.toLowerCase() || '';
+    const code = error.code || error.status;
+
     // Authentication errors
     if (
       code === 401 ||
@@ -172,38 +165,38 @@ export class RetryManager {
       message.includes('api key') ||
       message.includes('authentication')
     ) {
-      return 'authentication'
+      return 'authentication';
     }
-    
+
     // Rate limiting
     if (code === 429 || message.includes('rate limit')) {
-      return 'rate_limit'
+      return 'rate_limit';
     }
-    
+
     // Invalid request
     if (
       code === 400 ||
       message.includes('invalid') ||
       message.includes('validation')
     ) {
-      return 'invalid_request'
+      return 'invalid_request';
     }
-    
+
     // Not found
     if (code === 404 || message.includes('not found')) {
-      return 'not_found'
+      return 'not_found';
     }
-    
+
     // Permission denied
     if (code === 403 || message.includes('forbidden')) {
-      return 'permission_denied'
+      return 'permission_denied';
     }
-    
+
     // Server errors
     if (code >= 500 || message.includes('internal server')) {
-      return 'server_error'
+      return 'server_error';
     }
-    
+
     // Network errors
     if (
       message.includes('network') ||
@@ -211,19 +204,19 @@ export class RetryManager {
       message.includes('enotfound') ||
       message.includes('econnreset')
     ) {
-      return 'network'
+      return 'network';
     }
-    
+
     // Timeout
     if (
       message.includes('timeout') ||
       message.includes('etimedout') ||
       code === 'ETIMEDOUT'
     ) {
-      return 'timeout'
+      return 'timeout';
     }
-    
-    return 'unknown'
+
+    return 'unknown';
   }
 
   /**
@@ -235,81 +228,116 @@ export class RetryManager {
     options?: Partial<RetryOptions>
   ): T {
     return (async (...args: Parameters<T>) => {
-      return this.execute(() => fn(...args), context, options)
-    }) as T
+      return this.execute(() => fn(...args), context, options);
+    }) as T;
   }
 
   /**
    * Update configuration
    */
   updateConfig(config: Partial<RetryConfig>): void {
-    this.config = { ...this.config, ...config }
+    this.config = { ...this.config, ...config };
   }
 
   /**
    * Get current configuration
    */
   getConfig(): RetryConfig {
-    return { ...this.config }
+    return { ...this.config };
   }
 
   /**
    * Calculate delay for next retry
    */
   calculateDelay(attempt: number, options?: Partial<RetryOptions>): number {
-    const mergedOptions = { ...this.config, ...options }
-    
-    let delay: number
-    
+    const mergedOptions = { ...this.config, ...options };
+
+    let delay: number;
+
     switch (mergedOptions.backoff) {
       case 'exponential':
         delay = Math.min(
           mergedOptions.baseDelay * Math.pow(2, attempt - 1),
           mergedOptions.maxDelay
-        )
-        break
-      
+        );
+        break;
+
       case 'linear':
         delay = Math.min(
           mergedOptions.baseDelay * attempt,
           mergedOptions.maxDelay
-        )
-        break
-      
+        );
+        break;
+
       case 'fixed':
       default:
-        delay = mergedOptions.baseDelay
-        break
+        delay = mergedOptions.baseDelay;
+        break;
     }
-    
+
     // Add jitter to prevent thundering herd
-    const jitter = delay * 0.2 * Math.random()
-    return Math.floor(delay + jitter)
+    const jitter = delay * 0.2 * Math.random();
+    return Math.floor(delay + jitter);
   }
 
   /**
-   * Get retry statistics
+   * Get retry statistics for an error
    */
   getRetryStats(error: any): {
-    shouldRetry: boolean
-    errorType: string
-    suggestedDelay: number
-    maxAttempts: number
+    shouldRetry: boolean;
+    errorType: string;
+    suggestedDelay: number;
+    maxAttempts: number;
   } {
-    const errorType = this.categorizeError(error)
-    const shouldRetry = this.shouldRetry(error, this.config)
-    
+    const errorType = this.categorizeError(error);
+    const shouldRetry = this.isRetryableError(error);
+
     // Suggest longer delays for rate limits
-    let suggestedDelay = this.config.baseDelay
+    let suggestedDelay = this.config.baseDelay;
     if (errorType === 'rate_limit') {
-      suggestedDelay = this.config.baseDelay * 2
+      suggestedDelay = this.config.baseDelay * 2;
     }
-    
+
     return {
       shouldRetry,
       errorType,
       suggestedDelay,
-      maxAttempts: this.config.maxAttempts
-    }
+      maxAttempts: this.config.maxAttempts,
+    };
+  }
+
+  /**
+   * Create retry policy based on error type
+   */
+  createRetryPolicy(errorType: string): Partial<RetryOptions> {
+    const policies: Record<string, Partial<RetryOptions>> = {
+      rate_limit: {
+        maxAttempts: 5,
+        baseDelay: 5000,
+        maxDelay: 60000,
+        backoff: 'exponential',
+      },
+      server_error: {
+        maxAttempts: 3,
+        baseDelay: 2000,
+        maxDelay: 30000,
+        backoff: 'exponential',
+      },
+      network: {
+        maxAttempts: 4,
+        baseDelay: 1000,
+        maxDelay: 20000,
+        backoff: 'exponential',
+      },
+      timeout: {
+        maxAttempts: 2,
+        baseDelay: 3000,
+        maxDelay: 15000,
+        backoff: 'fixed',
+      },
+      default: this.config,
+    };
+
+    return policies[errorType] || (policies.default as any);
   }
 }

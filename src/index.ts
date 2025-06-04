@@ -2,7 +2,8 @@
 export { AIEngine } from './core/ai-engine';
 export { CacheManager } from './core/cache-manager';
 export { ConfigManager } from './core/config-manager';
-export { ErrorHandler, type EnhancedError } from './core/error-handler';
+export { EnhancedError, type ErrorContext } from './core/enhanced-error';
+export { ErrorHandler } from './core/error-handler';
 export { RateLimiter } from './core/rate-limiter';
 export { RetryManager } from './core/retry-manager';
 export { TokenManager } from './core/token-manager';
@@ -84,6 +85,28 @@ export const AIPresets = {
       strategy: 'fixed-window' as const,
     },
   },
+
+  browserOptimized: {
+    provider: 'openai' as const,
+    model: 'gpt-3.5-turbo',
+    cache: {
+      enabled: true,
+      ttl: 3600000,
+      maxSize: 50, // Smaller cache for browser
+      strategy: 'lru' as const,
+    },
+    rateLimit: {
+      requestsPerMinute: 30,
+      concurrent: 3, // Less concurrent requests in browser
+      strategy: 'sliding-window' as const,
+    },
+    retry: {
+      maxAttempts: 2,
+      baseDelay: 1000,
+      maxDelay: 10000,
+      backoff: 'exponential' as const,
+    },
+  },
 } as const;
 
 // Quick start function
@@ -91,11 +114,47 @@ export async function createAI(
   config: Partial<import('./types').AIConfig> = {}
 ) {
   const { AIEngine } = await import('./core/ai-engine');
+
+  // Use browser-optimized preset if in browser environment
+  const defaultPreset =
+    typeof window !== 'undefined'
+      ? AIPresets.browserOptimized
+      : AIPresets.production;
+
   return new AIEngine({
-    ...AIPresets.production,
+    ...defaultPreset,
     ...config,
   });
 }
 
 // Version
-export const VERSION = '1.0.0';
+export const VERSION = '2.0.0';
+
+// Browser compatibility check
+export function checkBrowserCompatibility(): {
+  compatible: boolean;
+  issues: string[];
+} {
+  const issues: string[] = [];
+
+  if (typeof globalThis === 'undefined') {
+    issues.push('globalThis is not defined');
+  }
+
+  if (typeof globalThis?.crypto?.subtle === 'undefined') {
+    issues.push('Web Crypto API is not available');
+  }
+
+  if (typeof TextEncoder === 'undefined') {
+    issues.push('TextEncoder is not available');
+  }
+
+  if (typeof fetch === 'undefined') {
+    issues.push('Fetch API is not available');
+  }
+
+  return {
+    compatible: issues.length === 0,
+    issues,
+  };
+}

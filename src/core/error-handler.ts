@@ -1,33 +1,21 @@
-import Boom from "@hapi/boom";
-import VError from "verror";
+import { EnhancedError, ErrorContext } from './enhanced-error';
 
-export interface ErrorContext {
-  provider: string;
-  operation: string;
-  model?: string;
-  attempt?: number;
-  metadata?: Record<string, any>;
+interface ErrorHistoryEntry {
+  timestamp: Date;
+  error: EnhancedError;
+  context: ErrorContext;
+  resolved: boolean;
 }
 
-export interface EnhancedError extends Error {
-  code?: string;
-  status?: number;
-  category?: string;
-  userMessage?: string;
-  isRetryable?: boolean;
-  context?: ErrorContext;
-  recommendations?: string[];
-  timestamp?: string;
+interface ErrorStats {
+  timestamp: string;
+  category: string;
+  provider: string;
+  message: string;
 }
 
 export class ErrorHandler {
-  private errorHistory: Array<{
-    timestamp: Date;
-    error: EnhancedError;
-    context: ErrorContext;
-    resolved: boolean;
-  }> = [];
-
+  private errorHistory: ErrorHistoryEntry[] = [];
   private maxHistorySize = 1000;
 
   /**
@@ -46,283 +34,17 @@ export class ErrorHandler {
    * Enhance error with additional information
    */
   private enhanceError(error: any, context: ErrorContext): EnhancedError {
-    // Create enhanced error using VError
-    const enhancedError = new VError(
-      {
-        name: this.getErrorName(error),
-        cause: error,
-        info: {
-          ...context,
-          originalError: {
-            message: error.message,
-            code: error.code,
-            status: error.status,
-          },
-        },
-      },
-      this.getErrorMessage(error, context)
-    ) as EnhancedError;
+    // Use EnhancedError.from to create enhanced error
+    const enhancedError = EnhancedError.from(error, context);
 
-    // Add additional properties
-    enhancedError.code = error.code || this.inferErrorCode(error);
-    enhancedError.status = error.status || this.inferStatusCode(error);
-    enhancedError.category = this.categorizeError(error);
-    enhancedError.userMessage = this.getUserFriendlyMessage(enhancedError);
-    enhancedError.isRetryable = this.isRetryable(enhancedError);
-    enhancedError.context = context;
-    enhancedError.recommendations = this.getRecommendations(enhancedError);
-    enhancedError.timestamp = new Date().toISOString();
+    // Add context-specific enhancements
+    if (context.attempt && context.attempt > 1) {
+      enhancedError.recommendations?.push(
+        `This was attempt ${context.attempt}. Consider using a fallback provider.`
+      );
+    }
 
     return enhancedError;
-  }
-
-  /**
-   * Get error name based on category
-   */
-  private getErrorName(error: any): string {
-    const category = this.categorizeError(error);
-
-    const errorNames: Record<string, string> = {
-      authentication: "AuthenticationError",
-      "rate-limit": "RateLimitError",
-      "invalid-request": "ValidationError",
-      "server-error": "ServerError",
-      network: "NetworkError",
-      timeout: "TimeoutError",
-      billing: "BillingError",
-      "not-found": "NotFoundError",
-      permission: "PermissionError",
-    };
-
-    return errorNames[category] || "AIProviderError";
-  }
-
-  /**
-   * Get formatted error message
-   */
-  private getErrorMessage(error: any, context: ErrorContext): string {
-    return `${context.operation} failed on ${context.provider}${
-      context.model ? ` (model: ${context.model})` : ""
-    }: ${error.message}`;
-  }
-
-  /**
-   * Categorize error
-   */
-  private categorizeError(error: any): string {
-    const message = error.message?.toLowerCase() || "";
-    const code = error.code || error.status;
-
-    if (
-      code === 401 ||
-      message.includes("unauthorized") ||
-      message.includes("api key")
-    ) {
-      return "authentication";
-    }
-
-    if (
-      code === 429 ||
-      message.includes("rate limit") ||
-      message.includes("quota exceeded")
-    ) {
-      return "rate-limit";
-    }
-
-    if (
-      code === 402 ||
-      message.includes("billing") ||
-      message.includes("payment")
-    ) {
-      return "billing";
-    }
-
-    if (
-      code === 400 ||
-      message.includes("invalid") ||
-      message.includes("validation")
-    ) {
-      return "invalid-request";
-    }
-
-    if (
-      code === 403 ||
-      message.includes("forbidden") ||
-      message.includes("permission")
-    ) {
-      return "permission";
-    }
-
-    if (code === 404 || message.includes("not found")) {
-      return "not-found";
-    }
-
-    if (code >= 500 || message.includes("internal server")) {
-      return "server-error";
-    }
-
-    if (
-      message.includes("network") ||
-      message.includes("econnrefused") ||
-      message.includes("enotfound")
-    ) {
-      return "network";
-    }
-
-    if (message.includes("timeout") || code === "ETIMEDOUT") {
-      return "timeout";
-    }
-
-    return "unknown";
-  }
-
-  /**
-   * Infer error code
-   */
-  private inferErrorCode(error: any): string {
-    if (error.code) return error.code;
-
-    const category = this.categorizeError(error);
-    const codes: Record<string, string> = {
-      authentication: "AUTH_ERROR",
-      "rate-limit": "RATE_LIMIT_ERROR",
-      "invalid-request": "VALIDATION_ERROR",
-      "server-error": "SERVER_ERROR",
-      network: "NETWORK_ERROR",
-      timeout: "TIMEOUT_ERROR",
-      billing: "BILLING_ERROR",
-      "not-found": "NOT_FOUND",
-      permission: "PERMISSION_DENIED",
-    };
-
-    return codes[category] || "UNKNOWN_ERROR";
-  }
-
-  /**
-   * Infer HTTP status code
-   */
-  private inferStatusCode(error: any): number {
-    if (error.status) return error.status;
-
-    const category = this.categorizeError(error);
-    const statuses: Record<string, number> = {
-      authentication: 401,
-      "rate-limit": 429,
-      "invalid-request": 400,
-      "server-error": 500,
-      network: 503,
-      timeout: 504,
-      billing: 402,
-      "not-found": 404,
-      permission: 403,
-    };
-
-    return statuses[category] || 500;
-  }
-
-  /**
-   * Get user-friendly error message
-   */
-  private getUserFriendlyMessage(error: EnhancedError): string {
-    const messages: Record<string, string> = {
-      authentication:
-        "Authentication failed. Please check your API key and ensure it has the necessary permissions.",
-      "rate-limit":
-        "Rate limit exceeded. Please wait a moment before trying again.",
-      billing:
-        "There is an issue with your billing or quota. Please check your account status.",
-      "invalid-request":
-        "The request contains invalid parameters. Please check your input and try again.",
-      "server-error":
-        "The AI service is temporarily unavailable. Please try again later.",
-      network:
-        "Network connection issue. Please check your internet connection and try again.",
-      timeout:
-        "The request timed out. Please try again with a shorter prompt or wait a moment.",
-      "not-found":
-        "The requested resource was not found. Please verify the endpoint or model name.",
-      permission: "You do not have permission to perform this action.",
-      unknown:
-        "An unexpected error occurred. Please try again or contact support if the issue persists.",
-    };
-
-    return messages[error.category || "unknown"] as any;
-  }
-
-  /**
-   * Determine if error is retryable
-   */
-  private isRetryable(error: EnhancedError): boolean {
-    const retryableCategories = [
-      "rate-limit",
-      "server-error",
-      "network",
-      "timeout",
-    ];
-    return retryableCategories.includes(error.category || "");
-  }
-
-  /**
-   * Get recommendations for resolving the error
-   */
-  private getRecommendations(error: EnhancedError): string[] {
-    const recommendations: string[] = [];
-
-    switch (error.category) {
-      case "authentication":
-        recommendations.push("Verify your API key is correct");
-        recommendations.push(
-          "Check if the API key has been revoked or expired"
-        );
-        recommendations.push(
-          "Ensure the API key has the necessary permissions"
-        );
-        break;
-
-      case "rate-limit":
-        recommendations.push("Implement request queuing or throttling");
-        recommendations.push(
-          "Consider upgrading your API plan for higher limits"
-        );
-        recommendations.push("Spread requests over time to avoid bursts");
-        break;
-
-      case "billing":
-        recommendations.push("Check your account balance and payment method");
-        recommendations.push("Review your usage and adjust limits if needed");
-        recommendations.push("Contact support if billing issues persist");
-        break;
-
-      case "invalid-request":
-        recommendations.push(
-          "Review the API documentation for correct parameters"
-        );
-        recommendations.push("Validate input data before sending requests");
-        recommendations.push(
-          "Check for any recent API changes or deprecations"
-        );
-        break;
-
-      case "network":
-        recommendations.push("Check your internet connection");
-        recommendations.push("Verify firewall or proxy settings");
-        recommendations.push("Try using a different network");
-        break;
-
-      case "timeout":
-        recommendations.push("Reduce the size of your request");
-        recommendations.push("Increase timeout settings if possible");
-        recommendations.push("Break large requests into smaller chunks");
-        break;
-    }
-
-    // Add context-specific recommendations
-    if (error.context?.attempt && error.context.attempt > 2) {
-      recommendations.push("Consider using a fallback provider");
-      recommendations.push("Implement circuit breaker pattern");
-    }
-
-    return recommendations;
   }
 
   /**
@@ -343,21 +65,49 @@ export class ErrorHandler {
   }
 
   /**
-   * Create HTTP-friendly error using Boom
+   * Create HTTP-friendly error response
    */
-  createHttpError(error: EnhancedError): Boom.Boom {
-    const boomError = Boom.boomify(error, {
-      statusCode: error.status || 500,
-      message: error.userMessage,
-    });
+  createHttpError(error: EnhancedError): {
+    statusCode: number;
+    error: string;
+    message: string;
+    code?: string;
+    category?: string;
+    isRetryable?: boolean;
+    recommendations?: string[];
+  } {
+    const statusCode = error.status || 500;
+    const errorName = this.getHttpErrorName(statusCode);
 
-    // Add custom data
-    boomError.output.payload.code = error.code;
-    boomError.output.payload.category = error.category;
-    boomError.output.payload.isRetryable = error.isRetryable;
-    boomError.output.payload.recommendations = error.recommendations;
+    return {
+      statusCode,
+      error: errorName,
+      message: error.userMessage || error.message,
+      code: error.code,
+      category: error.category,
+      isRetryable: error.isRetryable,
+      recommendations: error.recommendations,
+    };
+  }
 
-    return boomError;
+  /**
+   * Get HTTP error name from status code
+   */
+  private getHttpErrorName(statusCode: number): string {
+    const errorNames: Record<number, string> = {
+      400: 'Bad Request',
+      401: 'Unauthorized',
+      402: 'Payment Required',
+      403: 'Forbidden',
+      404: 'Not Found',
+      429: 'Too Many Requests',
+      500: 'Internal Server Error',
+      502: 'Bad Gateway',
+      503: 'Service Unavailable',
+      504: 'Gateway Timeout',
+    };
+
+    return errorNames[statusCode] || 'Unknown Error';
   }
 
   /**
@@ -368,12 +118,7 @@ export class ErrorHandler {
     byCategory: Record<string, number>;
     byProvider: Record<string, number>;
     resolutionRate: number;
-    recentErrors: Array<{
-      timestamp: string;
-      category: string;
-      provider: string;
-      message: string;
-    }>;
+    recentErrors: ErrorStats[];
   } {
     const cutoff = timeWindow ? Date.now() - timeWindow : 0;
     const relevantErrors = this.errorHistory.filter(
@@ -385,16 +130,16 @@ export class ErrorHandler {
       byCategory: {} as Record<string, number>,
       byProvider: {} as Record<string, number>,
       resolutionRate: 0,
-      recentErrors: [] as any[],
+      recentErrors: [] as ErrorStats[],
     };
 
     relevantErrors.forEach((entry) => {
       // Count by category
-      const category = entry.error.category || "unknown";
+      const category = entry.error.category || 'unknown';
       stats.byCategory[category] = (stats.byCategory[category] || 0) + 1;
 
       // Count by provider
-      const provider = entry.context.provider;
+      const provider = entry.context.provider || 'unknown';
       stats.byProvider[provider] = (stats.byProvider[provider] || 0) + 1;
 
       // Add to recent errors
@@ -446,16 +191,104 @@ export class ErrorHandler {
   }> {
     return this.errorHistory.map((entry) => ({
       timestamp: entry.timestamp.toISOString(),
-      error: {
-        message: entry.error.message,
-        code: entry.error.code,
-        category: entry.error.category,
-        userMessage: entry.error.userMessage,
-        isRetryable: entry.error.isRetryable,
-        recommendations: entry.error.recommendations,
-      },
+      error: entry.error.toJSON(),
       context: entry.context,
       resolved: entry.resolved,
     }));
+  }
+
+  /**
+   * Get error trends
+   */
+  getErrorTrends(
+    interval: 'hour' | 'day' | 'week' = 'day',
+    limit: number = 7
+  ): Array<{
+    period: string;
+    errors: number;
+    byCategory: Record<string, number>;
+  }> {
+    const intervalMs = {
+      hour: 3600000,
+      day: 86400000,
+      week: 604800000,
+    }[interval];
+
+    const now = Date.now();
+    const trends: Array<{
+      period: string;
+      errors: number;
+      byCategory: Record<string, number>;
+    }> = [];
+
+    for (let i = 0; i < limit; i++) {
+      const endTime = now - i * intervalMs;
+      const startTime = endTime - intervalMs;
+
+      const periodErrors = this.errorHistory.filter((entry) => {
+        const time = entry.timestamp.getTime();
+        return time >= startTime && time < endTime;
+      });
+
+      const byCategory: Record<string, number> = {};
+      periodErrors.forEach((entry) => {
+        const category = entry.error.category || 'unknown';
+        byCategory[category] = (byCategory[category] || 0) + 1;
+      });
+
+      trends.unshift({
+        period: new Date(endTime).toISOString(),
+        errors: periodErrors.length,
+        byCategory,
+      });
+    }
+
+    return trends;
+  }
+
+  /**
+   * Get most common errors
+   */
+  getMostCommonErrors(limit: number = 5): Array<{
+    message: string;
+    count: number;
+    category: string;
+    lastOccurred: string;
+  }> {
+    const errorCounts = new Map<
+      string,
+      {
+        count: number;
+        category: string;
+        lastOccurred: Date;
+      }
+    >();
+
+    this.errorHistory.forEach((entry) => {
+      const key = `${entry.error.category}:${entry.error.code || 'unknown'}`;
+      const existing = errorCounts.get(key);
+
+      if (existing) {
+        existing.count++;
+        if (entry.timestamp > existing.lastOccurred) {
+          existing.lastOccurred = entry.timestamp;
+        }
+      } else {
+        errorCounts.set(key, {
+          count: 1,
+          category: entry.error.category || 'unknown',
+          lastOccurred: entry.timestamp,
+        });
+      }
+    });
+
+    return Array.from(errorCounts.entries())
+      .map(([message, data]) => ({
+        message,
+        ...data,
+        lastOccurred: data.lastOccurred.toISOString(),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
   }
 }

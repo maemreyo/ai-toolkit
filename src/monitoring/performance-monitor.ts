@@ -167,9 +167,9 @@ export class PerformanceMonitor {
     const providers = new Set(this.history.map((r) => r.provider));
     const stats: Record<string, PerformanceStats> = {};
 
-    for (const provider of providers) {
+    Array.from(providers).forEach((provider) => {
       stats[provider] = this.getStats({ provider });
-    }
+    });
 
     return stats;
   }
@@ -181,9 +181,9 @@ export class PerformanceMonitor {
     const operations = new Set(this.history.map((r) => r.operation));
     const stats: Record<string, PerformanceStats> = {};
 
-    for (const operation of operations) {
+    Array.from(operations).forEach((operation) => {
       stats[operation] = this.getStats({ operation });
-    }
+    });
 
     return stats;
   }
@@ -192,7 +192,7 @@ export class PerformanceMonitor {
    * Get performance trends
    */
   getTrends(
-    interval: "minute" | "hour" | "day" = "hour",
+    interval: 'minute' | 'hour' | 'day' = 'hour',
     limit: number = 24
   ): Array<{
     timestamp: string;
@@ -259,14 +259,14 @@ export class PerformanceMonitor {
     };
 
     for (const [error, count] of errorCounts) {
-      if (error.includes("timeout"))
+      if (error.includes('timeout'))
         errorsByType.timeout = (errorsByType.timeout ?? 0) + count;
-      else if (error.includes("rate limit"))
+      else if (error.includes('rate limit'))
         errorsByType.rateLimit = (errorsByType.rateLimit ?? 0) + count;
-      else if (error.includes("auth") || error.includes("401"))
+      else if (error.includes('auth') || error.includes('401'))
         errorsByType.authentication =
           (errorsByType.authentication ?? 0) + count;
-      else if (error.includes("network"))
+      else if (error.includes('network'))
         errorsByType.network = (errorsByType.network ?? 0) + count;
       else errorsByType.other = (errorsByType.other ?? 0) + count;
     }
@@ -316,7 +316,7 @@ export class PerformanceMonitor {
     stats: PerformanceStats;
     statsByProvider: Record<string, PerformanceStats>;
     statsByOperation: Record<string, PerformanceStats>;
-    errorAnalysis: ReturnType<PerformanceMonitor["getErrorAnalysis"]>;
+    errorAnalysis: ReturnType<PerformanceMonitor['getErrorAnalysis']>;
   } {
     return {
       history: this.history,
@@ -338,7 +338,7 @@ export class PerformanceMonitor {
    * Check health status
    */
   getHealthStatus(): {
-    status: "healthy" | "degraded" | "unhealthy";
+    status: 'healthy' | 'degraded' | 'unhealthy';
     issues: string[];
   } {
     const stats = this.getStats();
@@ -361,10 +361,10 @@ export class PerformanceMonitor {
 
     const status =
       issues.length === 0
-        ? "healthy"
+        ? 'healthy'
         : issues.length === 1
-          ? "degraded"
-          : "unhealthy";
+          ? 'degraded'
+          : 'unhealthy';
 
     return { status, issues };
   }

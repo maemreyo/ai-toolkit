@@ -1,7 +1,7 @@
 {
   "name": "@matthew.ngo/ai-toolkit",
   "version": "2.0.0",
-  "description": "A comprehensive AI toolkit with multi-provider support",
+  "description": "A comprehensive AI toolkit with multi-provider support, fully browser-compatible",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -28,16 +28,18 @@
     "dev": "tsup --watch",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:browser": "playwright test",
     "lint": "eslint src --ext ts,tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,md}\"",
     "typecheck": "tsc --noEmit",
     "release": "changeset publish",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "size": "size-limit",
+    "analyze": "size-limit --why"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
     "@google/generative-ai": "^0.11.0",
-    "@hapi/boom": "^10.0.1",
     "@huggingface/inference": "^2.6.0",
     "ai": "^4.3.15",
     "bottleneck": "^2.19.5",
@@ -46,16 +48,14 @@
     "lru-cache": "^10.2.0",
     "openai": "^4.47.0",
     "p-retry": "^6.2.0",
-    "prom-client": "^15.1.0",
-    "tiktoken": "^1.0.15",
-    "verror": "^1.10.1",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
+    "@playwright/test": "^1.42.0",
+    "@size-limit/preset-small-lib": "^11.0.0",
     "@types/node": "^20.12.0",
     "@types/react": "^18.3.0",
-    "@types/verror": "^1.10.11",
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
     "@vitest/coverage-v8": "^1.5.0",
@@ -63,6 +63,7 @@
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.2.0",
     "react": "^18.3.0",
+    "size-limit": "^11.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.5.0"
@@ -83,7 +84,9 @@
     "google",
     "machine-learning",
     "toolkit",
-    "multi-provider"
+    "multi-provider",
+    "browser-compatible",
+    "edge-runtime"
   ],
   "author": "Htur Wehttam",
   "license": "MIT",
@@ -105,5 +108,33 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "size-limit": [
+    {
+      "path": "dist/index.mjs",
+      "limit": "50 KB"
+    },
+    {
+      "path": "dist/react/index.mjs",
+      "limit": "10 KB"
+    },
+    {
+      "path": "dist/providers/openai.mjs",
+      "limit": "15 KB"
+    },
+    {
+      "path": "dist/providers/anthropic.mjs",
+      "limit": "15 KB"
+    },
+    {
+      "path": "dist/providers/google.mjs",
+      "limit": "15 KB"
+    }
+  ],
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not op_mini all",
+    "maintained node versions"
+  ]
 }

@@ -1,5 +1,5 @@
-import Bottleneck from "bottleneck";
-import { RateLimitConfig } from "../types";
+import Bottleneck from 'bottleneck';
+import { RateLimitConfig } from '../types';
 
 interface RateLimiterOptions extends RateLimitConfig {
   id: string;
@@ -30,15 +30,15 @@ export class RateLimiter {
     let limiterConfig: Bottleneck.ConstructorOptions;
 
     switch (options.strategy) {
-      case "token-bucket":
+      case 'token-bucket':
         limiterConfig = this.createTokenBucketConfig(options);
         break;
 
-      case "fixed-window":
+      case 'fixed-window':
         limiterConfig = this.createFixedWindowConfig(options);
         break;
 
-      case "sliding-window":
+      case 'sliding-window':
       default:
         limiterConfig = this.createSlidingWindowConfig(options);
         break;
@@ -47,11 +47,11 @@ export class RateLimiter {
     const limiter = new Bottleneck(limiterConfig);
 
     // Add event handlers
-    limiter.on("error", (error) => {
+    limiter.on('error', (error) => {
       console.error(`Rate limiter error for ${options.id}:`, error);
     });
 
-    limiter.on("failed", async (error) => {
+    limiter.on('failed', async (error) => {
       console.warn(`Job failed in rate limiter ${options.id}:`, error);
       // Retry logic can be added here
     });
@@ -133,7 +133,7 @@ export class RateLimiter {
   async getAllStats(): Promise<Record<string, LimiterStats>> {
     const stats: Record<string, LimiterStats> = {};
 
-    for (const [id] of this.limiters) {
+    for (const id of Array.from(this.limiters.keys())) {
       const limiterStats = await this.getStats(id);
       if (limiterStats) {
         stats[id] = limiterStats;
@@ -201,7 +201,7 @@ export class RateLimiter {
   async stopAll(): Promise<void> {
     const stopPromises: Promise<void>[] = [];
 
-    for (const [id] of this.limiters) {
+    for (const id of Array.from(this.limiters.keys())) {
       stopPromises.push(this.stopLimiter(id));
     }
 
@@ -280,7 +280,7 @@ export class RateLimiter {
     // In a real implementation, you might store configs separately
     return {
       requestsPerMinute: 60,
-      strategy: "sliding-window",
+      strategy: 'sliding-window',
       concurrent: 5,
     };
   }

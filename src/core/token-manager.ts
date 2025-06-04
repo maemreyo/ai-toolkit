@@ -1,5 +1,4 @@
-import { encode } from "gpt-tokenizer";
-import { encoding_for_model, get_encoding } from "tiktoken";
+import { decode, encode } from 'gpt-tokenizer';
 
 interface TokenInfo {
   count: number;
@@ -12,28 +11,28 @@ interface ModelTokenLimits {
 }
 
 export class TokenManager {
-  // // private encoders = new Map<string, any>()
+  private tokenizers = new Map<string, (text: string) => number[]>();
 
   private tokenLimits: ModelTokenLimits = {
     // OpenAI models
-    "gpt-4": 8192,
-    "gpt-4-32k": 32768,
-    "gpt-4-turbo": 128000,
-    "gpt-4-turbo-preview": 128000,
-    "gpt-3.5-turbo": 4096,
-    "gpt-3.5-turbo-16k": 16384,
+    'gpt-4': 8192,
+    'gpt-4-32k': 32768,
+    'gpt-4-turbo': 128000,
+    'gpt-4-turbo-preview': 128000,
+    'gpt-3.5-turbo': 4096,
+    'gpt-3.5-turbo-16k': 16384,
 
     // Anthropic models
-    "claude-3-opus": 200000,
-    "claude-3-sonnet": 200000,
-    "claude-3-haiku": 200000,
-    "claude-2.1": 200000,
-    "claude-2": 100000,
+    'claude-3-opus': 200000,
+    'claude-3-sonnet': 200000,
+    'claude-3-haiku': 200000,
+    'claude-2.1': 200000,
+    'claude-2': 100000,
 
     // Google models
-    "gemini-pro": 30720,
-    "gemini-pro-vision": 30720,
-    "palm-2": 8192,
+    'gemini-pro': 30720,
+    'gemini-pro-vision': 30720,
+    'palm-2': 8192,
 
     // Default
     default: 4096,
@@ -41,63 +40,87 @@ export class TokenManager {
 
   private modelPricing = {
     // OpenAI pricing per 1K tokens
-    "gpt-4": { input: 0.03, output: 0.06 },
-    "gpt-4-turbo": { input: 0.01, output: 0.03 },
-    "gpt-3.5-turbo": { input: 0.0005, output: 0.0015 },
+    'gpt-4': { input: 0.03, output: 0.06 },
+    'gpt-4-turbo': { input: 0.01, output: 0.03 },
+    'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
 
     // Anthropic pricing per 1K tokens
-    "claude-3-opus": { input: 0.015, output: 0.075 },
-    "claude-3-sonnet": { input: 0.003, output: 0.015 },
-    "claude-3-haiku": { input: 0.00025, output: 0.00125 },
+    'claude-3-opus': { input: 0.015, output: 0.075 },
+    'claude-3-sonnet': { input: 0.003, output: 0.015 },
+    'claude-3-haiku': { input: 0.00025, output: 0.00125 },
 
     // Google pricing per 1K tokens
-    "gemini-pro": { input: 0.0005, output: 0.0015 },
+    'gemini-pro': { input: 0.0005, output: 0.0015 },
 
     // Default free
     default: { input: 0, output: 0 },
   };
+
+  constructor() {
+    // Initialize tokenizers for different models
+    this.initializeTokenizers();
+  }
+
+  /**
+   * Initialize tokenizers for different model families
+   */
+  private initializeTokenizers(): void {
+    // Use the main encode function for all models
+    // The gpt-tokenizer library will handle model-specific encoding internally
+    const defaultTokenizer = (text: string) => encode(text);
+
+    // GPT-4 models
+    this.tokenizers.set('gpt-4', defaultTokenizer);
+    this.tokenizers.set('gpt-4-32k', defaultTokenizer);
+    this.tokenizers.set('gpt-4-turbo', defaultTokenizer);
+    this.tokenizers.set('gpt-4-turbo-preview', defaultTokenizer);
+
+    // GPT-3.5 models
+    this.tokenizers.set('gpt-3.5-turbo', defaultTokenizer);
+    this.tokenizers.set('gpt-3.5-turbo-16k', defaultTokenizer);
+
+    // Default tokenizer for other models
+    this.tokenizers.set('default', defaultTokenizer);
+  }
 
   /**
    * Count tokens in text for a specific model
    */
   async countTokens(text: string, model: string): Promise<number> {
     try {
-      // Use tiktoken for OpenAI models
-      if (
-        model.includes("gpt") ||
-        model.includes("davinci") ||
-        model.includes("turbo")
-      ) {
-        return this.countTokensWithTiktoken(text, model);
-      }
-
-      // Use gpt-tokenizer as fallback for other models
-      return encode(text).length;
+      // Get appropriate tokenizer for the model
+      const tokenizer = this.getTokenizerForModel(model);
+      const tokens = tokenizer(text);
+      return tokens.length;
     } catch (error) {
+      console.warn(
+        `Failed to tokenize with model-specific tokenizer, using estimation`,
+        error
+      );
       // Fallback to character-based estimation
       return this.estimateTokens(text);
     }
   }
 
   /**
-   * Count tokens using tiktoken
+   * Get the appropriate tokenizer for a model
    */
-  private countTokensWithTiktoken(text: string, model: string): number {
-    try {
-      // Try to get encoding for specific model
-      const encoder = encoding_for_model(model as any);
-      const tokens = encoder.encode(text);
-      const count = tokens.length;
-      encoder.free(); // Free memory
-      return count;
-    } catch {
-      // Fallback to cl100k_base encoding
-      const encoder = get_encoding("cl100k_base");
-      const tokens = encoder.encode(text);
-      const count = tokens.length;
-      encoder.free();
-      return count;
+  private getTokenizerForModel(model: string): (text: string) => number[] {
+    // Direct match
+    if (this.tokenizers.has(model)) {
+      return this.tokenizers.get(model)!;
     }
+
+    // Pattern matching for model families
+    if (model.startsWith('gpt-4')) {
+      return this.tokenizers.get('gpt-4')!;
+    }
+    if (model.startsWith('gpt-3.5')) {
+      return this.tokenizers.get('gpt-3.5-turbo')!;
+    }
+
+    // Default tokenizer
+    return this.tokenizers.get('default')!;
   }
 
   /**
@@ -167,7 +190,7 @@ export class TokenManager {
     // Binary search for the right length
     let low = 0;
     let high = text.length;
-    let bestFit = "";
+    let bestFit = '';
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
@@ -187,9 +210,9 @@ export class TokenManager {
 
     // Add ellipsis if truncated
     if (preserveEnd) {
-      return "..." + bestFit;
+      return '...' + bestFit;
     } else {
-      return bestFit + "...";
+      return bestFit + '...';
     }
   }
 
@@ -205,7 +228,7 @@ export class TokenManager {
     const chunks: string[] = [];
     const sentences = this.splitIntoSentences(text);
 
-    let currentChunk = "";
+    let currentChunk = '';
     let currentTokens = 0;
 
     for (const sentence of sentences) {
@@ -221,14 +244,14 @@ export class TokenManager {
             model,
             overlap
           );
-          currentChunk = overlapText + " " + sentence;
+          currentChunk = overlapText + ' ' + sentence;
           currentTokens = await this.countTokens(currentChunk, model);
         } else {
           currentChunk = sentence;
           currentTokens = sentenceTokens;
         }
       } else {
-        currentChunk += (currentChunk ? " " : "") + sentence;
+        currentChunk += (currentChunk ? ' ' : '') + sentence;
         currentTokens += sentenceTokens;
       }
     }
@@ -244,8 +267,44 @@ export class TokenManager {
    * Split text into sentences
    */
   private splitIntoSentences(text: string): string[] {
-    // Simple sentence splitting - can be improved with better NLP
-    return text.match(/[^.!?]+[.!?]+/g) || [text];
+    // Improved sentence splitting with better handling of abbreviations
+    const sentenceEnders = /[.!?]+/g;
+    const abbreviations = new Set([
+      'Dr',
+      'Mr',
+      'Mrs',
+      'Ms',
+      'Prof',
+      'Sr',
+      'Jr',
+      'Inc',
+      'Ltd',
+      'Co',
+      'Corp',
+      'etc',
+      'vs',
+      'e.g',
+      'i.e',
+    ]);
+
+    const parts = text.split(sentenceEnders);
+    const sentences: string[] = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]?.trim();
+      if (!part) continue;
+
+      // Check if this might be an abbreviation
+      const lastWord = part.split(/\s+/).pop() || '';
+      if (abbreviations.has(lastWord) && i < parts.length - 1) {
+        // Merge with next part
+        parts[i + 1] = part + '. ' + parts[i + 1];
+      } else {
+        sentences.push(part + '.');
+      }
+    }
+
+    return sentences.filter((s) => s.length > 0);
   }
 
   /**
@@ -257,13 +316,13 @@ export class TokenManager {
     overlapTokens: number
   ): Promise<string> {
     const sentences = this.splitIntoSentences(text).reverse();
-    let overlapText = "";
+    let overlapText = '';
     let currentTokens = 0;
 
     for (const sentence of sentences) {
       const sentenceTokens = await this.countTokens(sentence, model);
       if (currentTokens + sentenceTokens <= overlapTokens) {
-        overlapText = sentence + " " + overlapText;
+        overlapText = sentence + ' ' + overlapText;
         currentTokens += sentenceTokens;
       } else {
         break;
@@ -279,7 +338,7 @@ export class TokenManager {
   estimateCost(
     tokens: number,
     model: string,
-    type: "input" | "output" = "input"
+    type: 'input' | 'output' = 'input'
   ): number {
     const pricing =
       this.modelPricing[model as keyof typeof this.modelPricing] ??
@@ -321,5 +380,18 @@ export class TokenManager {
     }
 
     return totalTokens;
+  }
+
+  /**
+   * Decode tokens back to text
+   */
+  async decodeTokens(tokens: number[], _model: string): Promise<string> {
+    try {
+      // gpt-tokenizer supports decoding
+      return decode(tokens);
+    } catch (error) {
+      console.warn('Failed to decode tokens', error);
+      return '';
+    }
   }
 }
